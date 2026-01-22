@@ -1,5 +1,5 @@
 import os.path
-if os.path.exists('Image Files/example1.jpg'):
+if os.path.exists('Image Files/example1.jpeg'):
     TEST_LOCAL = True
 else:
     TEST_LOCAL = False
@@ -16,12 +16,12 @@ import time
 
 DEFAULT_RES = (4056, 3040)
 
-CROPPED_RES_X_START, CROPPED_RES_Y_START = 300, 200
-CROPPED_RES_X_END, CROPPED_RES_Y_END = 3856, 2840
+CROPPED_RES_X_START, CROPPED_RES_Y_START = 300, 100
+CROPPED_RES_X_END, CROPPED_RES_Y_END = 4056-300, 3040-100
 
 GSD_ISS_CM_PER_PIXEL = 12648
 
-FAST_THRESHOLD, EDGE_THRESHOLD = 5, 200
+FAST_THRESHOLD, EDGE_THRESHOLD = 15, 0
 
 ################################
 
@@ -110,19 +110,20 @@ def measure_cam(t):
     if TEST_LOCAL == False:
         camera = Camera()
         
-        time1 = time.time()
+#         time1 = time.time()
         photo1_filename = camera.take_photo('image_' + str(datetime.now().strftime("%H:%M:%S")) + '.jpg')
         
         time.sleep(t)
         
         photo2_filename = camera.take_photo('image_' + str(datetime.now().strftime("%H:%M:%S")) + '.jpg')
-        time2 = time.time()
+#         time2 = time.time()
         
-        time_difference = time2 - time1  # It will take longer than t to take the pictures so this is the real value
+#         time_difference = time2 - time1  # It will take longer than t to take the pictures so this is the real value
+        time_difference = get_time_difference(photo1_filename, photo2_filename)
         
     else:
-        photo1_filename = 'Image Files/example1.jpg'
-        photo2_filename = 'Image Files/example2.jpg'
+        photo1_filename = 'Image Files/example1.jpeg'
+        photo2_filename = 'Image Files/example2.jpeg'
         time_difference = get_time_difference(photo1_filename, photo2_filename) # Get time difference between the example images
 
        

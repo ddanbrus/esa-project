@@ -7,7 +7,7 @@ from cam import measure_cam
 ####################################
 
 
-t = 2
+t = 0.2
 
 velocity_from_latlong = measure_latlong(t)
 velocity_from_cam = measure_cam(t)
