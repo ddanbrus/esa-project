@@ -16,12 +16,12 @@ import time
 
 DEFAULT_RES = (4056, 3040)
 
-CROPPED_RES_X_START, CROPPED_RES_Y_START = 300, 100
-CROPPED_RES_X_END, CROPPED_RES_Y_END = 4056-300, 3040-100
+CROPPED_RES_X_START, CROPPED_RES_Y_START = 1200, 1000
+CROPPED_RES_X_END, CROPPED_RES_Y_END = 4056-1200, 3040-1000
 
 GSD_ISS_CM_PER_PIXEL = 12648
 
-FAST_THRESHOLD, EDGE_THRESHOLD = 15, 0
+FAST_THRESHOLD, EDGE_THRESHOLD = 16, 0
 
 ################################
 
@@ -46,24 +46,42 @@ def convert_to_cv(image_1, image_2):
     image_1_cv = cv2.imread(image_1, 0)
     image_2_cv = cv2.imread(image_2, 0)
     
+#     image_1_cv = cv2.equalizeHist(image_1_cv)
+#     image_2_cv = cv2.equalizeHist(image_2_cv)
+
+    
     #crop images
     cropped_image_1 = image_1_cv[CROPPED_RES_Y_START:CROPPED_RES_Y_END, CROPPED_RES_X_START:CROPPED_RES_X_END]
     cropped_image_2 = image_2_cv[CROPPED_RES_Y_START:CROPPED_RES_Y_END, CROPPED_RES_X_START:CROPPED_RES_X_END]
-
+    
     
     return cropped_image_1, cropped_image_2
 
 def calculate_features(image_1, image_2, feature_number):
-    orb = cv2.ORB_create(nfeatures = feature_number, fastThreshold=FAST_THRESHOLD, edgeThreshold=EDGE_THRESHOLD)
-    keypoints_1, descriptors_1 = orb.detectAndCompute(image_1, None)
-    keypoints_2, descriptors_2 = orb.detectAndCompute(image_2, None)
+#     orb = cv2.ORB_create(nfeatures = feature_number, fastThreshold=FAST_THRESHOLD, edgeThreshold=EDGE_THRESHOLD, scaleFactor=1.2, nlevels=11)
+#     keypoints_1, descriptors_1 = orb.detectAndCompute(image_1, None)
+#     keypoints_2, descriptors_2 = orb.detectAndCompute(image_2, None)
+
+    akaze = cv2.AKAZE_create(threshold=0.0001)
+    keypoints_1, descriptors_1 = akaze.detectAndCompute(image_1, None)
+    keypoints_2, descriptors_2 = akaze.detectAndCompute(image_2, None)
+    
     return keypoints_1, keypoints_2, descriptors_1, descriptors_2
 
 def calculate_matches(descriptors_1, descriptors_2):
     brute_force = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-    matches = brute_force.match(descriptors_1, descriptors_2)
-    matches = sorted(matches, key=lambda x: x.distance)
-    return matches
+#     matches = brute_force.match(descriptors_1, descriptors_2)
+#     matches = sorted(matches, key=lambda x: x.distance)
+    
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+    matches = bf.knnMatch(descriptors_1, descriptors_2, k=2)
+
+    good = []
+    for m, n in matches:
+        if m.distance < 0.9 * n.distance:   # try 0.75–0.9
+            good.append(m)
+    return good
+#     return matches
 
 def display_matches(image_1_cv, keypoints_1, image_2_cv, keypoints_2, matches):
     match_img = cv2.drawMatches(image_1_cv, keypoints_1, image_2_cv, keypoints_2, matches[:100], None)
@@ -92,6 +110,8 @@ def calculate_mean_distance(coordinates_1, coordinates_2):
         y_difference = coordinate[0][1] - coordinate[1][1]
         distance = math.hypot(x_difference, y_difference)
         all_distances = all_distances + distance
+        
+
     return all_distances / len(merged_coordinates)
 
 def calculate_speed_in_kmps(feature_distance, GSD, time_difference):
@@ -110,32 +130,29 @@ def measure_cam(t):
     if TEST_LOCAL == False:
         camera = Camera()
         
-#         time1 = time.time()
         photo1_filename = camera.take_photo('image_' + str(datetime.now().strftime("%H:%M:%S")) + '.jpg')
         
         time.sleep(t)
         
         photo2_filename = camera.take_photo('image_' + str(datetime.now().strftime("%H:%M:%S")) + '.jpg')
-#         time2 = time.time()
-        
-#         time_difference = time2 - time1  # It will take longer than t to take the pictures so this is the real value
-        time_difference = get_time_difference(photo1_filename, photo2_filename)
-        
     else:
         photo1_filename = 'Image Files/example1.jpeg'
         photo2_filename = 'Image Files/example2.jpeg'
-        time_difference = get_time_difference(photo1_filename, photo2_filename) # Get time difference between the example images
-
+        
+    time_difference = get_time_difference(photo1_filename, photo2_filename) # Get time difference between the example images
        
     image_1_cv, image_2_cv = convert_to_cv(photo1_filename, photo2_filename) # Create OpenCV image objects
     
-    keypoints_1, keypoints_2, descriptors_1, descriptors_2 = calculate_features(image_1_cv, image_2_cv, 1000) # Get keypoints and descriptors
+    keypoints_1, keypoints_2, descriptors_1, descriptors_2 = calculate_features(image_1_cv, image_2_cv, 2000) # Get keypoints and descriptors
     
     matches = calculate_matches(descriptors_1, descriptors_2) # Match descriptors
     
+    if len(matches) == 0:
+        print("no matches found")
+        return None
+    
     if TEST_LOCAL == True:
         display_matches(image_1_cv, keypoints_1, image_2_cv, keypoints_2, matches) # Display matches
-        
     
     coordinates_1, coordinates_2 = find_matching_coordinates(keypoints_1, keypoints_2, matches)
     
@@ -146,4 +163,5 @@ def measure_cam(t):
     
     speed = calculate_speed_in_kmps(average_feature_distance, GSD_ISS_CM_PER_PIXEL, time_difference)
     
+    print("got real speed: ", speed)
     return speed
